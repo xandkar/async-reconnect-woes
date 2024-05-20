@@ -1,11 +1,14 @@
-use std::{future::Future, io, time::Duration};
+use std::{future::Future, io, pin::pin, time::Duration};
 
-use tokio::{net::TcpStream, time::sleep};
+use tokio::{io::AsyncReadExt, net::TcpStream, time::sleep};
 
 struct Worker {
     addr: String,
     stream: Option<TcpStream>,
 }
+
+trait Captures<U> {}
+impl<T: ?Sized, U> Captures<U> for T {}
 
 impl Worker {
     fn new(addr: &str) -> Self {
@@ -16,23 +19,40 @@ impl Worker {
     }
 
     async fn send(&mut self, msg: &[u8]) -> io::Result<()> {
-        self.with(|stream| {
+        self.with(move |stream| {
             use tokio::io::AsyncWriteExt;
 
-            stream.write_all(msg)
+            stream.write_all(&msg)
         })
         .await
     }
 
-    async fn with<Fun, Fut, T>(&mut self, f: Fun) -> io::Result<T>
+    // Note, not cancel safe
+    fn with<'c, 'b: 'c, 'a: 'b, Fun, Fut>(
+        &'a mut self,
+        f: Fun,
+    ) -> impl Captures<&'a ()> + Future<Output = io::Result<()>>
     where
-        Fun: FnOnce(&mut TcpStream) -> Fut,
-        Fut: Future<Output = io::Result<T>>,
+        Fun: 'c + FnOnce(&'a mut TcpStream) -> Fut,
+        Fut: 'c + Future<Output = io::Result<()>>,
+        // T: 'static,
     {
-        if self.stream.is_none() {
-            let stream = TcpStream::connect(self.addr.as_str()).await?;
-            self.stream = Some(stream);
+        struct InnerStream<'a> {
+            stream: &mut Option<TcpStream>,
         }
+
+        async move {
+            let new_stream = if self.stream.is_none() {
+                let stream = TcpStream::connect(&self.addr).await?;
+                Some(stream)
+            } else {
+                None
+            };
+            self.stream = self.stream.take().or(new_stream);
+            let stream = self.stream.as_mut().unwrap();
+            f(stream).await
+        }
+        /*
         let result = {
             let stream = self.stream.as_mut().unwrap();
             f(stream).await
@@ -41,6 +61,7 @@ impl Worker {
             self.stream = None;
         }
         result
+        */
     }
 }
 
