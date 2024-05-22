@@ -1,16 +1,18 @@
-use std::{io, net::TcpStream, thread::sleep, time::Duration};
+use std::{
+    io,
+    net::{SocketAddr, TcpStream},
+    thread::sleep,
+    time::Duration,
+};
 
 struct Worker {
-    addr: String,
+    addr: SocketAddr,
     stream: Option<TcpStream>,
 }
 
 impl Worker {
-    fn new(addr: &str) -> Self {
-        Self {
-            addr: addr.to_string(),
-            stream: None,
-        }
+    fn new(addr: SocketAddr) -> Self {
+        Self { addr, stream: None }
     }
 
     fn send(&mut self, msg: &[u8]) -> io::Result<()> {
@@ -25,7 +27,7 @@ impl Worker {
         F: FnOnce(&mut TcpStream) -> io::Result<T>,
     {
         if self.stream.is_none() {
-            let stream = TcpStream::connect(self.addr.as_str())?;
+            let stream = TcpStream::connect(self.addr)?;
             self.stream = Some(stream);
         }
         let stream = self.stream.as_mut().unwrap_or_else(|| unreachable!());
@@ -38,7 +40,7 @@ impl Worker {
 }
 
 fn main() -> io::Result<()> {
-    let mut w = Worker::new("localhost:8000");
+    let mut w = Worker::new("127.0.0.1:8000".parse().unwrap());
     loop {
         let result = w.send(b"foo\n");
         eprintln!("[debug] result: {:?}", result);

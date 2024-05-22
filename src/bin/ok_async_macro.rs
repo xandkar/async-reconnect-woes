@@ -1,4 +1,4 @@
-use std::{io, time::Duration};
+use std::{io, net::SocketAddr, time::Duration};
 
 use tokio::{io::AsyncWriteExt, net::TcpStream, time::sleep};
 
@@ -9,7 +9,7 @@ macro_rules! with_stream {
                 Some(ref mut s) =>
                     s.$method($($args),+).await,
                 None => {
-                    match TcpStream::connect($selph.addr.as_str()).await {
+                    match TcpStream::connect($selph.addr).await {
                         Err(e) =>Err(e),
                         Ok(stream) => {
                             $selph.stream = Some(stream);
@@ -27,16 +27,13 @@ macro_rules! with_stream {
 }
 
 struct Worker {
-    addr: String,
+    addr: SocketAddr,
     stream: Option<TcpStream>,
 }
 
 impl Worker {
-    fn new(addr: &str) -> Self {
-        Self {
-            addr: addr.to_string(),
-            stream: None,
-        }
+    fn new(addr: SocketAddr) -> Self {
+        Self { addr, stream: None }
     }
 
     async fn send(&mut self, msg: &[u8]) -> io::Result<()> {
@@ -46,7 +43,7 @@ impl Worker {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let mut w = Worker::new("localhost:8000");
+    let mut w = Worker::new("127.0.0.1:8000".parse().unwrap());
     loop {
         let result = w.send(b"foo\n").await;
         eprintln!("[debug] result: {:?}", result);

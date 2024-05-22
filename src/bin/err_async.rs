@@ -1,18 +1,15 @@
-use std::{future::Future, io, time::Duration};
+use std::{future::Future, io, net::SocketAddr, time::Duration};
 
 use tokio::{net::TcpStream, time::sleep};
 
 struct Worker {
-    addr: String,
+    addr: SocketAddr,
     stream: Option<TcpStream>,
 }
 
 impl Worker {
-    fn new(addr: &str) -> Self {
-        Self {
-            addr: addr.to_string(),
-            stream: None,
-        }
+    fn new(addr: SocketAddr) -> Self {
+        Self { addr, stream: None }
     }
 
     async fn send(&mut self, msg: &[u8]) -> io::Result<()> {
@@ -30,7 +27,7 @@ impl Worker {
         Fut: Future<Output = io::Result<T>>,
     {
         if self.stream.is_none() {
-            let stream = TcpStream::connect(self.addr.as_str()).await?;
+            let stream = TcpStream::connect(self.addr).await?;
             self.stream = Some(stream);
         }
         let result = {
@@ -46,7 +43,7 @@ impl Worker {
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let mut w = Worker::new("localhost:8000");
+    let mut w = Worker::new("127.0.0.1:8000".parse().unwrap());
     loop {
         let result = w.send(b"foo\n").await;
         eprintln!("[debug] result: {:?}", result);
