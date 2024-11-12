@@ -12,8 +12,8 @@ impl Worker {
         Self { addr, stream: None }
     }
 
-    async fn send(&mut self, msg: &[u8]) -> io::Result<()> {
-        self.with(|stream| {
+    async fn send<'a>(&'a mut self, msg: &[u8]) -> io::Result<()> {
+        self.with(|stream: &'a mut TcpStream| {
             use tokio::io::AsyncWriteExt;
 
             stream.write_all(msg)
@@ -21,9 +21,9 @@ impl Worker {
         .await
     }
 
-    async fn with<Fun, Fut, T>(&mut self, f: Fun) -> io::Result<T>
+    async fn with<'a, Fun, Fut, T>(&'a mut self, f: Fun) -> io::Result<T>
     where
-        Fun: FnOnce(&mut TcpStream) -> Fut,
+        Fun: FnOnce(&'a mut TcpStream) -> Fut,
         Fut: Future<Output = io::Result<T>>,
     {
         if self.stream.is_none() {
