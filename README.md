@@ -67,7 +67,7 @@ Problem
 The basic synchronous version of this works just fine
 ([`src/bin/client_ok_sync.rs`](src/bin/client_ok_sync.rs)). But when translated
 directly to async
-([`src/bin/client_err_async.rs.rs`](src/bin/client_err_async.rs.rs)), we
+([`src/bin/client_err_async.rs`](src/bin/client_err_async.rs)), we
 suddenly face a lifetime issue for which I'm yet to find a fully-satisfactory
 solution:
 
